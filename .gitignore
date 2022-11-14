@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+#makefiles
+Makefile
+*.make
+
+#output dirs
+/bin
+/obj
