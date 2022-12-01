@@ -2,14 +2,16 @@
 
 using namespace avenir;
 
-ThreadPool::ThreadPool(uint32_t numThreads, std::list<std::packaged_task<void()>>&& queue)
-	: m_jobQueue(std::move(queue))
+ThreadPool::ThreadPool(uint32_t numThreads, std::list<std::packaged_task<void()>>& queue)
 {
+	m_jobQueue.splice(m_jobQueue.end(), queue);
 	addThreads(numThreads);
 }
 	
 ThreadPool::ThreadPool(uint32_t numThreads)
-	: ThreadPool(numThreads, std::list<std::packaged_task<void()>>()) {}
+{
+	addThreads(numThreads);
+}
 
 ThreadPool::~ThreadPool()
 {
@@ -32,6 +34,12 @@ void ThreadPool::addThreads(uint32_t numThreads)
 				lock.unlock();
 				
 				job();
+				
+				if(m_jobQueue.empty())
+				{
+					m_waitFlag.clear();
+					m_waitFlag.notify_all();
+				}
 				
 				if(stoken.stop_requested()) { return; }
 			}
@@ -56,6 +64,18 @@ std::list<std::packaged_task<void()>> ThreadPool::moveTasks()
 	std::list<std::packaged_task<void()>> queueTmp;
 	queueTmp.splice(queueTmp.end(), m_jobQueue);
 	return queueTmp;
+}
+
+void ThreadPool::pushTasks(std::list<std::packaged_task<void()>>& tasks)
+{
+	std::unique_lock<std::mutex> lock(m_queueMutex);
+	m_jobQueue.splice(m_jobQueue.end(), tasks);
+}
+
+void ThreadPool::waitTilEmpty()
+{
+	m_waitFlag.test_and_set();
+	m_waitFlag.wait(true);
 }
 
 uint32_t ThreadPool::getThreadCount() const { return m_pool.size(); }

@@ -8,6 +8,7 @@
 #include <future>
 #include <stack>
 #include <concepts>
+#include <atomic>
 
 namespace avenir
 {
@@ -17,7 +18,7 @@ public:
 //constructors and assignment operators
 	ThreadPool(uint32_t numThreads);
 	//construct by moving tasks from a list
-	ThreadPool(uint32_t numThreads, std::list<std::packaged_task<void()>>&& queue);
+	ThreadPool(uint32_t numThreads, std::list<std::packaged_task<void()>>& queue);
 	ThreadPool(const ThreadPool& other) = delete; //no copy constructor
 	ThreadPool& operator= (const ThreadPool& other) = delete; //no copy assignment
 	ThreadPool(ThreadPool&& other) = delete; //no move constructor
@@ -58,6 +59,13 @@ public:
 	
 	//move all unstarted tasks into a new queue and return it
 	std::list<std::packaged_task<void()>> moveTasks();
+
+	//move tasks from a list into the queue
+	void pushTasks(std::list<std::packaged_task<void()>>& tasks);
+
+	//wait until the queue is empty, other threads can still push taks while
+	//the waiting thread is blocked
+	void waitTilEmpty();
 	
 	uint32_t getThreadCount() const;
 	uint32_t jobsRemaining() const;
@@ -66,5 +74,6 @@ private:
 	std::list<std::packaged_task<void()>> m_jobQueue;
 	std::condition_variable_any m_cv;
 	std::mutex m_queueMutex;
+	std::atomic_flag m_waitFlag;
 };
 }
