@@ -1,6 +1,8 @@
 # avenir
+Development is currently on hiatus.
+
 A simple c++ concurrency library
-This is a project I am doing to learn and is still very much a work in progress. It is probably not suitable for production enviroments.
+This is a project I am doing to learn and is still very much a work in progress. It is probably not suitable for production environments.
 
 Features will include:
 
