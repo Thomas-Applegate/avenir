@@ -26,17 +26,28 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <deque>
 #include <optional>
 #include <utility>
+#include <chrono>
 
 namespace avenir
 {
 
+//thread safe multi-producer multi-consumer queue
 template <typename T>
 class queue
 {
 public:
 	queue() = default;
-	queue(const queue&) = delete;
 	
+	queue(const queue&) : m_mtx(), m_cv(), m_deque()
+	{
+		std::scoped_lock lock(m_mtx, oth.m_mtx);
+		for(const T& o : oth.m_deque)
+		{
+			m_deque.push_back(o);
+		}
+	}
+	
+	//the move constructor leaves the other queue in an empty but valid state
 	queue(queue&& oth) : m_mtx(), m_cv(), m_deque()
 	{
 		std::scoped_lock lock(m_mtx, oth.m_mtx);
@@ -47,11 +58,27 @@ public:
 		}
 	}
 	
+	queue& operator=(const queue& oth)
+	{
+		if(this != &oth)
+		{
+			std::scoped_lock lock(m_mtx, oth.m_mtx);
+			m_deque.clear();
+			for(const T& o : oth.m_deque)
+			{
+				m_deque.push_back(o);
+			}
+		}
+		return *this;
+	}
+	
+	//move assignment leaves the other queue in an empty but valid state
 	queue& operator=(queue&& oth)
 	{
 		if(this != &oth)
 		{
 			std::scoped_lock lock(m_mtx, oth.m_mtx);
+			m_deque.clear();
 			while(!oth.m_deque.empty())
 			{
 				m_deque.emplace_back(std::move(oth.m_deque.front()));
@@ -91,7 +118,8 @@ public:
 		return ret;
 	}
 	
-	//immediately pop from the queue or wait until notified and pop
+	//immediately pop from the queue if possible
+	//or wait until notified and pop
 	T wait()
 	{
 		std::unique_lock<std::mutex> lock(m_mtx);
@@ -102,6 +130,83 @@ public:
 		T ret = std::move(m_deque.front());
 		m_deque.pop_front();
 		return ret;
+	}
+	
+	//immediately pop from the queue if possible
+	//or wait for duration or until notified and pop
+	//returns nullopt if nothing is available
+	template <typename Rep, typename Period>
+	std::optional<T> wait_for(const std::chrono::duration<Rep, Period>& rel_time)
+	{
+		std::optional<T> ret;
+		std::unique_lock<std::mutex> lock(m_mtx);
+		if(m_deque.empty())
+		{
+			if(m_cv.wait_for(lock, rel_time,[this]{
+				[this]{ return !m_deque.empty();
+			}))
+			{
+				ret = std::move(m_deque.front());
+				m_deque.pop_front();	
+			}
+		}else
+		{
+			ret = std::move(m_deque.front());
+			m_deque.pop_front();	
+		}
+		return ret;
+	}
+	
+	//immediately pop from the queue if possible
+	//or wait until time point or until notified and pop
+	//returns nullopt if nothing is available
+	template <typename Clock, typename Duration>
+	std::optional<T> wait_until(const std::chrono::time_point<Clock, Duration>& abs_time)
+	{
+		std::optional<T> ret;
+		std::unique_lock<std::mutex> lock(m_mtx);
+		if(m_deque.empty())
+		{
+			if(m_cv.wait_for(lock, abs_time, [this]{
+				return !m_deque.empty(); 
+			}))
+			{
+				ret = std::move(m_deque.front());
+				m_deque.pop_front();	
+			}
+		}else
+		{
+			ret = std::move(m_deque.front());
+			m_deque.pop_front();	
+		}
+		return ret;
+	}
+	
+	//copy the contents of another queue<T> into this
+	void copy_from(const queue& oth)
+	{
+		if(this != &oth)
+		{
+			std::scoped_lock lock(m_mtx, oth.m_mtx);
+			for(const T& o : oth.m_deque)
+			{
+				m_deque.push_back(o);
+			}
+		}
+	}
+	
+	//move the contents of another queue<T> into this
+	void splice(queue& oth)
+	{
+		if(this != &oth)
+		{
+			std::scoped_lock lock(m_mtx, oth.m_mtx);
+			while(!oth.m_deque.empty())
+			{
+				m_deque.emplace_back(std::move(oth.m_deque.front()));
+				oth.m_deque.pop_front();
+			}
+		}
 	}
 	
 	bool empty() const
