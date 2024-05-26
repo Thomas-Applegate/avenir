@@ -38,7 +38,7 @@ class queue
 public:
 	queue() = default;
 	
-	queue(const queue&) : m_mtx(), m_cv(), m_deque()
+	queue(const queue& oth) : m_mtx(), m_cv(), m_deque()
 	{
 		std::scoped_lock lock(m_mtx, oth.m_mtx);
 		for(const T& o : oth.m_deque)
@@ -142,8 +142,8 @@ public:
 		std::unique_lock<std::mutex> lock(m_mtx);
 		if(m_deque.empty())
 		{
-			if(m_cv.wait_for(lock, rel_time,[this]{
-				[this]{ return !m_deque.empty();
+			if(m_cv.wait_for(lock, rel_time, [this]{
+				return !m_deque.empty();
 			}))
 			{
 				ret = std::move(m_deque.front());
