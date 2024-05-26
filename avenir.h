@@ -36,8 +36,30 @@ class queue
 public:
 	queue() = default;
 	queue(const queue&) = delete;
-	//queue(queue&& oth) -TODO move constructor
-	//queue& operator=(queue&& oth) -TODO move assignment
+	
+	queue(queue&& oth) : m_mtx(), m_cv(), m_deque()
+	{
+		std::scoped_lock lock(m_mtx, oth.m_mtx);
+		while(!oth.m_deque.empty())
+		{
+			m_deque.emplace_back(std::move(oth.m_deque.front()));
+			oth.m_deque.pop_front();
+		}
+	}
+	
+	queue& operator=(queue&& oth)
+	{
+		if(this != &oth)
+		{
+			std::scoped_lock lock(m_mtx, oth.m_mtx);
+			while(!oth.m_deque.empty())
+			{
+				m_deque.emplace_back(std::move(oth.m_deque.front()));
+				oth.m_deque.pop_front();
+			}
+		}
+		return *this;
+	}
 	
 	void push(const T& obj)
 	{
