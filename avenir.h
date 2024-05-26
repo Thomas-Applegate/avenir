@@ -219,7 +219,7 @@ public:
 		return m_deque.size();
 	}
 private:
-	std::mutex m_mtx;
+	mutable std::mutex m_mtx;
 	std::condition_variable m_cv;
 	std::deque<T> m_deque;
 };
