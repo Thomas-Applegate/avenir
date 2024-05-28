@@ -27,12 +27,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <optional>
 #include <utility>
 #include <chrono>
+#include <memory>
 
 namespace avenir
 {
 
 //thread safe multi-producer multi-consumer queue
-template <typename T>
+template<typename T>
 class queue
 {
 public:
@@ -96,7 +97,7 @@ public:
 		m_cv.notify_one();
 	}
 	
-	template <typename... Args>
+	template<typename... Args>
 	void emplace(Args&&... args)
 	{
 		std::unique_lock<std::mutex> lock(m_mtx);
@@ -222,6 +223,36 @@ private:
 	mutable std::mutex m_mtx;
 	std::condition_variable m_cv;
 	std::deque<T> m_deque;
+};
+
+template<typename T>
+class promise;
+
+template<>
+class promise<void>
+{
+	
+};
+
+template<typename T>
+class promise
+{
+	
+};
+
+template<typename T>
+class future;
+
+template<>
+class future<void>
+{
+	
+};
+
+template<typename T>
+class future
+{
+	
 };
 
 }
