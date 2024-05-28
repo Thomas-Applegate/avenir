@@ -228,20 +228,81 @@ private:
 template<typename T>
 class promise;
 
+template<typename T>
+class future;
+
 template<>
 class promise<void>
 {
+private:
+	template<typename U>
+	friend class promise;
 	
+	template<typename U>
+	friend class future;
+	
+	struct state
+	{
+		std::mutex mtx;
+		std::condition_variable cv;
+		short status; //0 unset, 1 ready, 2 broken
+		state(short status) : mtx(), cv(), status(status) {}
+		virtual ~state() {}
+	};
+	
+	std::shared_ptr<state> m_state;
+public:
+	promise(bool ready=false)
+	: m_state(std::make_shared<state>(ready ? 1 : 0)) {}
+	promise(const promise& oth) = delete;
+	promise(promise&& oth) : m_state(std::move(oth.m_state)) {}
+	
+	promise& operator=(promise&& oth)
+	{
+		//TODO
+		return *this;
+	}
 };
 
 template<typename T>
 class promise
 {
+	template<typename U>
+	friend class future;
 	
+	struct state : public promise<void>::state
+	{
+		char storage[sizeof(T)];
+		state() : promise<void>::state(0) {}
+		state(const T& o) : state(1)
+		{
+			new (storage) T(o);
+		}
+		state(T&& o) : state(1)
+		{
+			new (storage) T(std::move(o));
+		}
+		~state()
+		{
+			if(status == 1)
+			{
+				reinterpret_cast<T*>(storage)->~T();
+			}
+		}
+	};
+	
+	std::shared_ptr<state> m_state;
+public:
+	promise() : m_state(std::make_shared<state>()) {}
+	promise(const promise& oth) = delete;
+	promise(promise&& oth) : m_state(std::move(oth.m_state)) {}
+	
+	promise& operator=(promise&& oth)
+	{
+		//TODO
+		return *this;
+	}
 };
-
-template<typename T>
-class future;
 
 template<>
 class future<void>
@@ -254,5 +315,11 @@ class future
 {
 	
 };
+
+template<typename T>
+std::optional<future<T>> future_cast(const future<void>& f)
+{
+	return std::nullopt; //TODO
+}
 
 }
