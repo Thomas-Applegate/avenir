@@ -257,10 +257,47 @@ public:
 	promise(const promise& oth) = delete;
 	promise(promise&& oth) : m_state(std::move(oth.m_state)) {}
 	
+	~promise()
+	{
+		if(m_state)
+		{
+			std::unique_lock<std::mutex> lock(m_state->mtx);
+			if(m_state->status == 0)
+			{
+				m_state->status = 2;
+				lock.unlock();
+				m_state->cv.notify_all();
+			}
+		}
+	}
+	
 	promise& operator=(promise&& oth)
 	{
-		//TODO
+		if(this != &oth)
+		{
+			if(m_state)
+			{
+				std::unique_lock<std::mutex> lock(m_state->mtx);
+				if(m_state->status == 0)
+				{
+					m_state->status = 2;
+					lock.unlock();
+					m_state->cv.notify_all();
+				}
+			}
+			m_state = std::move(oth.m_state);
+		}
 		return *this;
+	}
+	
+	void set()
+	{
+		//TODO
+	}
+	
+	void set_at_thread_exit()
+	{
+		//TODO
 	}
 };
 
@@ -294,12 +331,41 @@ class promise
 	std::shared_ptr<state> m_state;
 public:
 	promise() : m_state(std::make_shared<state>()) {}
+	promise(const T& obj) : m_state(std::make_shared<state>(obj)) {}
+	promise(T&& obj) : m_state(std::make_shared<state>(std::move(obj))) {}
 	promise(const promise& oth) = delete;
 	promise(promise&& oth) : m_state(std::move(oth.m_state)) {}
 	
+	~promise()
+	{
+		if(m_state)
+		{
+			std::unique_lock<std::mutex> lock(m_state->mtx);
+			if(m_state->status == 0)
+			{
+				m_state->status = 2;
+				lock.unlock();
+				m_state->cv.notify_all();
+			}
+		}
+	}
+	
 	promise& operator=(promise&& oth)
 	{
-		//TODO
+		if(this != &oth)
+		{
+			if(m_state)
+			{
+				std::unique_lock<std::mutex> lock(m_state->mtx);
+				if(m_state->status == 0)
+				{
+					m_state->status = 2;
+					lock.unlock();
+					m_state->cv.notify_all();
+				}
+			}
+			m_state = std::move(oth.m_state);
+		}
 		return *this;
 	}
 };
