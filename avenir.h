@@ -290,14 +290,22 @@ public:
 		return *this;
 	}
 	
-	void set()
+	//make the promise ready
+	//returns true if set or false if promise is already set or broken
+	bool set()
 	{
-		//TODO
-	}
-	
-	void set_at_thread_exit()
-	{
-		//TODO
+		if(m_state)
+		{
+			std::unique_lock<std::mutex> lock(m_state->mtx);
+			if(m_state->status == 0)
+			{
+				m_state->status = 1;
+				lock.unlock();
+				m_state->cv.notify_all();
+				return true;
+			}
+		}
+		return false;
 	}
 };
 
