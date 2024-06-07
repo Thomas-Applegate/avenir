@@ -241,6 +241,9 @@ private:
 	template<typename U>
 	friend class future;
 	
+	template<typename U>
+	friend std::optional<future<U>> future_cast(const future<void>& f);
+	
 	struct state
 	{
 		std::mutex mtx;
@@ -327,7 +330,7 @@ class promise
 		{
 			new (storage) T(std::move(o));
 		}
-		~state()
+		virtual ~state()
 		{
 			if(status == 1)
 			{
@@ -376,18 +379,65 @@ public:
 		}
 		return *this;
 	}
+	
+	//copy into promise and make ready
+	//returns true if set or false if promise is already set or broken
+	bool set(const T& obj)
+	{
+		if(m_state)
+		{
+			std::unique_lock<std::mutex> lock(m_state->mtx);
+			if(m_state->status == 0)
+			{
+				m_state->status = 1;
+				new (m_state->storage) T(obj);
+				lock.unlock();
+				m_state->cv.notify_all();
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	//emplace into promise and make ready
+	//returns true if set or false if promise is already set or broken
+	template<typename... Args>
+	bool emplace(Args&&... args)
+	{
+		if(m_state)
+		{
+			std::unique_lock<std::mutex> lock(m_state->mtx);
+			if(m_state->status == 0)
+			{
+				m_state->status = 1;
+				new (m_state->storage) T(std::forward<Args>(args)...);
+				lock.unlock();
+				m_state->cv.notify_all();
+				return true;
+			}
+		}
+		return false;
+	}
 };
 
 template<>
 class future<void>
 {
+	template<typename U>
+	friend std::optional<future<U>> future_cast(const future<void>& f);
 	
+	std::shared_ptr<promise<void>::state> m_state;
+public:
 };
 
 template<typename T>
 class future
 {
+	template<typename U>
+	friend std::optional<future<U>> future_cast(const future<void>& f);
 	
+	std::shared_ptr<promise<T>::state> m_state;
+public:
 };
 
 template<typename T>
