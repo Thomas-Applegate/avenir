@@ -21,6 +21,8 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE 
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+#pragma once
+
 #include <mutex>
 #include <condition_variable>
 #include <deque>
@@ -436,7 +438,7 @@ class future
 	template<typename U>
 	friend std::optional<future<U>> future_cast(const future<void>& f);
 	
-	std::shared_ptr<promise<T>::state> m_state;
+	std::shared_ptr<typename promise<T>::state> m_state;
 public:
 };
 
